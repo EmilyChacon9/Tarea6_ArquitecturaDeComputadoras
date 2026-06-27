@@ -52,7 +52,6 @@ public:
         write8(a + 3, (v >> 24) & 0xFF);
     }
 
-    // Print hex dump [start, end] inclusive
     void dump(uint32_t start, uint32_t end) const {
         std::cout << std::hex << std::uppercase;
         for (uint32_t a = start; a <= end; ++a) {
@@ -69,7 +68,6 @@ class CPU {
     Memory &mem;
     bool halted = false;
 
-    // ── decode ──
     DecodedInstruction decode(uint32_t instr) {
         DecodedInstruction d{};
         d.opcode = instr & 0x7F;
@@ -127,7 +125,6 @@ public:
         bool jumped = false;
 
         switch (d.opcode) {
-            // ── Load ──────────────────────────────── 0x03
             case 0x03: {
                 uint32_t addr = rd(d.rs1) + d.imm_I;
                 switch (d.funct3) {
@@ -146,7 +143,6 @@ public:
                 break;
             }
 
-            // ── I-Type ALU ────────────────────────── 0x13
             case 0x13:
                 switch (d.funct3) {
                     case 0x0: wr(d.rd, rd(d.rs1) + d.imm_I);
@@ -172,12 +168,10 @@ public:
                 }
                 break;
 
-            // ── AUIPC ─────────────────────────────── 0x17
             case 0x17:
                 wr(d.rd, pc + d.imm_U);
                 break;
 
-            // ── Store ─────────────────────────────── 0x23
             case 0x23: {
                 uint32_t addr = rd(d.rs1) + d.imm_S;
                 switch (d.funct3) {
@@ -192,7 +186,6 @@ public:
                 break;
             }
 
-            // ── R-Type ────────────────────────────── 0x33
             case 0x33:
                 switch (d.funct3) {
                     case 0x0:
@@ -220,12 +213,10 @@ public:
                 }
                 break;
 
-            // ── LUI ───────────────────────────────── 0x37
             case 0x37:
                 wr(d.rd, d.imm_U);
                 break;
 
-            // ── Branch ────────────────────────────── 0x63
             case 0x63: {
                 bool taken = false;
                 switch (d.funct3) {
@@ -250,14 +241,12 @@ public:
                 break;
             }
 
-            // ── JALR ──────────────────────────────── 0x67
             case 0x67:
                 wr(d.rd, pc + 4);
                 pc = (rd(d.rs1) + d.imm_I) & ~1u;
                 jumped = true;
                 break;
 
-            // ── JAL ───────────────────────────────── 0x6F
             case 0x6F:
                 wr(d.rd, pc + 4);
                 pc += d.imm_J;
@@ -275,9 +264,6 @@ public:
     }
 };
 
-// ─────────────────────────────────────────────
-//  Helper: parse register name  (x0-x31)
-// ─────────────────────────────────────────────
 static int parse_reg(const std::string &s) {
     if (s.size() >= 2 && s[0] == 'x') {
         try { return std::stoi(s.substr(1)); } catch (...) {
@@ -286,9 +272,6 @@ static int parse_reg(const std::string &s) {
     return -1;
 }
 
-// ─────────────────────────────────────────────
-//  Main / REPL
-// ─────────────────────────────────────────────
 int main(int argc, char **argv) {
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <program.bin>\n";
@@ -312,26 +295,21 @@ int main(int argc, char **argv) {
         ss >> cmd;
 
         if (cmd.empty()) {
-            // ignore blank lines
         }
-        // ── step ──
         else if (cmd == "step") {
             cpu.step();
             std::cout << "Executed instruction. PC = 0x"
                     << std::hex << std::setw(8) << std::setfill('0')
                     << cpu.get_pc() << std::dec << '\n';
         }
-        // ── run ── (run until halt)
         else if (cmd == "run") {
             while (!cpu.is_halted()) cpu.step();
         }
-        // ── pc ──
         else if (cmd == "pc") {
             std::cout << "pc = 0x"
                     << std::hex << std::setw(8) << std::setfill('0')
                     << cpu.get_pc() << std::dec << '\n';
         }
-        // ── regs [x0 x1 ...] ──
         else if (cmd == "regs") {
             std::string tok;
             std::vector<int> rs;
@@ -341,7 +319,6 @@ int main(int argc, char **argv) {
                 else std::cerr << "Unknown register: " << tok << '\n';
             }
             if (rs.empty()) {
-                // print all
                 for (int i = 0; i < 32; ++i) {
                     std::cout << "x" << std::setw(2) << std::setfill('0') << i
                             << " = 0x" << std::hex << std::setw(8) << std::setfill('0')
@@ -356,7 +333,6 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        // ── mem <start> <end> ──
         else if (cmd == "mem") {
             std::string s1, s2;
             if (ss >> s1 >> s2) {
@@ -370,12 +346,10 @@ int main(int argc, char **argv) {
                 std::cerr << "Usage: mem <start_hex> <end_hex>\n";
             }
         }
-        // ── exit ──
         else if (cmd == "exit") {
             std::cout << "See you next time...\nProgram exited with code 0.\n";
             break;
         }
-        // ── help ──
         else if (cmd == "help") {
             std::cout <<
                     "Commands:\n"
@@ -393,6 +367,3 @@ int main(int argc, char **argv) {
     }
     return 0;
 }
-
-// Para ejecutar
-// ./arqui_tarea6 programa.bin
