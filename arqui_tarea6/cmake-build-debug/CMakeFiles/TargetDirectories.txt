@@ -1,0 +1,3 @@
+/Users/emilychacon/CLionProjects/arqui_tarea6/cmake-build-debug/CMakeFiles/arqui_tarea6.dir
+/Users/emilychacon/CLionProjects/arqui_tarea6/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/emilychacon/CLionProjects/arqui_tarea6/cmake-build-debug/CMakeFiles/rebuild_cache.dir
