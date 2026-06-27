@@ -2,6 +2,18 @@
 
 El simulador fue implementado inicialmente en C++ para poder ejecutarse en la terminal, pero se decidió utilizar HTML en Visual Studio Code para poder utilizar una versión en el navegador que funcione lo más cercano a CPUlator. En la presente tarea se entregan ambas versiones del código.
 
+## Ejecución en C++
+Para ejecutar el cpp, se debe realizar el siguiente comando en la terminal:
+
+```./arqui_tarea6 programa.bin```
+
+**IMPORTANTE:** en donde dice *"programa.bin"* se debe reemplazar por el nombre del .bin (riscvtest.bin, bucle_sumar.bin, arbol.bin o quicksort.bin)
+
+## Ejecución en Visual Studio Code
+
+Para ejecutar el HTML, se utilizó la extensión *Live Preview* de VSCode para poder visualizarlo en el navegador.
+
+## Detalles
 En ambas versiones se implementaron instrucciones ISA en base RV32I, incluyendo las 37 instrucciones que se pedían: loads, stores, instrucciones aritméticas o con inmediatos, operaciones lógicas, instrucciones de desplazamiento, los saltos y las ramas condicionales. Se consideró un espacio de direcciones de 32 bits.
 
 El simulador es capaz de cargar programas desde archivos binarios crudos (o raw) .bin al address 0x00000000 y soportar la ejecución paso a paso de cada instrucción.
