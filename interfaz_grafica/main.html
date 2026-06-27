@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RISC-V Simulator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --border:   #30363d;
+    --accent:   #58a6ff;
+    --accent2:  #3fb950;
+    --warn:     #f0883e;
+    --danger:   #f85149;
+    --text:     #e6edf3;
+    --muted:    #8b949e;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 48px 1fr;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    margin-right: auto;
+  }
+  header .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    color: var(--muted);
+  }
+  #status-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    border-radius: 4px;
+    padding: 2px 8px;
+    background: #21262d;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  #status-chip.loaded  { color: var(--accent2); border-color: var(--accent2); }
+  #status-chip.halted  { color: var(--danger);  border-color: var(--danger);  }
+  #status-chip.running { color: var(--warn);    border-color: var(--warn);    }
+
+  main {
+    display: grid;
+    grid-template-columns: 220px 1fr 280px;
+    grid-template-rows: 1fr;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel:last-child { border-right: none; }
+  .panel-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  #controls { gap: 6px; }
+  #controls .panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 10px;
+  }
+
+  label.file-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #0d1117;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 8px 0;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  label.file-btn:hover { opacity: 0.85; }
+  #file-input { display: none; }
+
+  #pc-display {
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  #pc-display span { color: var(--muted); font-size: 10px; display: block; margin-bottom: 2px; }
+  #pc-val { color: var(--accent); font-weight: 700; font-size: 14px; }
+
+  .sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+  button {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 0;
+    cursor: pointer;
+    transition: opacity 0.15s, background 0.15s;
+    width: 100%;
+  }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  #btn-step  { background: #21262d; border: 1px solid var(--border); color: var(--text); }
+  #btn-run   { background: var(--accent2); color: #0d1117; }
+  #btn-reset { background: #21262d; border: 1px solid var(--border); color: var(--warn); }
+
+  #step-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    padding: 2px 0;
+  }
+
+  .mem-controls {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .mem-controls input {
+    flex: 1;
+    background: #21262d;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 6px;
+    outline: none;
+  }
+  .mem-controls input:focus { border-color: var(--accent); }
+  .mem-controls button {
+    width: auto;
+    padding: 4px 10px;
+    background: #21262d;
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 11px;
+  }
+
+  .reg-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+  }
+  .reg-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #21262d;
+    border-radius: 4px;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .reg-row.changed {
+    border-color: var(--accent2);
+    background: #0d2119;
+  }
+  .reg-name { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .reg-val  { font-family: var(--mono); font-size: 11px; color: var(--text); font-weight: 600; }
+
+  #mem-table {
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #mem-table td {
+    padding: 2px 4px;
+    border-bottom: 1px solid #1c2128;
+  }
+  #mem-table .addr { color: var(--muted); }
+  #mem-table .byte { color: var(--text); }
+  #mem-table .byte.nz { color: var(--accent); }
+  #mem-table .ascii { color: var(--muted); letter-spacing: 0.03em; }
+  #mem-table tr:hover td { background: #21262d; }
+
+  #console-out {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px;
+    line-height: 1.6;
+    flex: 1;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  #console-out::-webkit-scrollbar { width: 4px; }
+  #console-out::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-info  { color: var(--text); }
+  .log-step  { color: var(--accent2); }
+  .log-warn  { color: var(--warn); }
+  .log-error { color: var(--danger); }
+  .log-cmd   { color: var(--accent); }
+
+  .console-input-row {
+    display: flex;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .console-prompt {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+    padding: 8px 8px 8px 12px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  #console-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>▶ RISC-V Simulator</h1>
+  <span class="chip">RV32I</span>
+  <span id="status-chip">No file</span>
+</header>
+
+<main>
+  <div class="panel" id="controls">
+    <div class="panel-header"><span class="panel-title">Controls</span></div>
+    <div class="panel-body">
+      <label class="file-btn">
+        ⬆ Load .bin
+        <input type="file" id="file-input" accept=".bin">
+      </label>
+
+      <div id="pc-display">
+        <span>Program Counter</span>
+        <div id="pc-val">0x00000000</div>
+      </div>
+
+      <div id="step-count">0 instructions executed</div>
+
+      <div class="sep"></div>
+
+      <button id="btn-step" disabled>⏭ Step</button>
+      <button id="btn-run"  disabled>▶ Run</button>
+      <button id="btn-reset" disabled>↺ Reset</button>
+
+      <div class="sep"></div>
+
+      <div class="panel-title" style="padding: 2px 2px 6px">Registers</div>
+      <div class="reg-grid" id="reg-grid"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="border-right:1px solid var(--border)">
+    <div class="panel-header">
+      <span class="panel-title">Console</span>
+      <button onclick="clearConsole()" style="width:auto;padding:2px 8px;background:#21262d;border:1px solid var(--border);color:var(--muted);font-size:10px;">clear</button>
+    </div>
+    <div id="console-out"></div>
+    <div class="console-input-row">
+      <span class="console-prompt">›</span>
+      <input id="console-input" type="text" placeholder="step / run / pc / regs x5 / mem 0x1000 0x101F / reset / help" autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><span class="panel-title">Memory</span></div>
+    <div class="mem-controls">
+      <input id="mem-addr" type="text" value="0x00000000" placeholder="Start addr">
+      <input id="mem-len"  type="text" value="64" placeholder="Bytes">
+      <button onclick="refreshMem()">Go</button>
+    </div>
+    <div class="panel-body" style="padding:0">
+      <table id="mem-table"><tbody id="mem-body"></tbody></table>
+    </div>
+  </div>
+</main>
+
+<script>
+
+class Memory {
+  constructor(size = 1 << 20) {
+    this.data = new Uint8Array(size);
+  }
+  load(bytes) { this.data.set(bytes, 0); }
+  reset() { this.data.fill(0); }
+
+  r8 (a) { return this.data[a] ?? 0; }
+  r16(a) { return this.r8(a) | (this.r8(a+1) << 8); }
+  r32(a) { return (this.r8(a) | (this.r8(a+1)<<8) | (this.r8(a+2)<<16) | (this.r8(a+3)<<24)) >>> 0; }
+
+  w8 (a, v) { this.data[a] = v & 0xFF; }
+  w16(a, v) { this.w8(a, v); this.w8(a+1, v>>8); }
+  w32(a, v) { this.w8(a,v); this.w8(a+1,v>>8); this.w8(a+2,v>>16); this.w8(a+3,v>>24); }
+}
+
+class CPU {
+  constructor(mem) {
+    this.mem   = mem;
+    this.regs  = new Int32Array(32);
+    this.pc    = 0;
+    this.steps = 0;
+    this.halted = false;
+  }
+
+  wr(r, v) { if (r !== 0) this.regs[r] = v | 0; }
+  rd(r)    { return r === 0 ? 0 : this.regs[r]; }
+
+  decode(instr) {
+    const s = instr | 0;
+    return {
+      opcode: instr & 0x7F,
+      rd:    (instr >>  7) & 0x1F,
+      f3:    (instr >> 12) & 0x07,
+      rs1:   (instr >> 15) & 0x1F,
+      rs2:   (instr >> 20) & 0x1F,
+      f7:    (instr >> 25) & 0x7F,
+      immI:   s >> 20,
+      immS:  ((s >> 20) & ~0x1F) | ((instr >> 7) & 0x1F),
+      immB:  ((s >> 19) & 0xFFFFF000) | ((instr >> 7) & 0x1E) | ((instr << 4) & 0x800) | ((instr >> 20) & 0x7E0),
+      immU:   instr & 0xFFFFF000,
+      immJ:  ((s >> 11) & 0xFFF00000) | (instr & 0xFF000) | ((instr >> 9) & 0x800) | ((instr >> 20) & 0x7FE),
+    };
+  }
+
+  step() {
+    if (this.halted) return 'halted';
+    const instr = this.mem.r32(this.pc);
+    const d = this.decode(instr);
+    let jumped = false;
+
+    switch (d.opcode) {
+      case 0x03: { // Loads
+        const addr = (this.rd(d.rs1) + d.immI) >>> 0;
+        switch (d.f3) {
+          case 0: this.wr(d.rd, (this.mem.r8(addr) << 24) >> 24); break; // LB
+          case 1: this.wr(d.rd, (this.mem.r16(addr) << 16) >> 16); break; // LH
+          case 2: this.wr(d.rd, this.mem.r32(addr)); break; // LW
+          case 4: this.wr(d.rd, this.mem.r8(addr)); break; // LBU
+          case 5: this.wr(d.rd, this.mem.r16(addr)); break; // LHU
+          default: return this._unknown(d);
+        }
+        break;
+      }
+      case 0x13: { // I-type ALU
+        const rs = this.rd(d.rs1);
+        switch (d.f3) {
+          case 0: this.wr(d.rd, rs + d.immI); break; // ADDI
+          case 1: this.wr(d.rd, rs << (d.immI & 0x1F)); break; // SLLI
+          case 2: this.wr(d.rd, rs < d.immI ? 1 : 0); break; // SLTI
+          case 3: this.wr(d.rd, (rs >>> 0) < (d.immI >>> 0) ? 1 : 0); break; // SLTIU
+          case 4: this.wr(d.rd, rs ^ d.immI); break; // XORI
+          case 5: this.wr(d.rd, d.f7 === 0x20 ? rs >> (d.immI & 0x1F) : rs >>> (d.immI & 0x1F)); break; // SRAI/SRLI
+          case 6: this.wr(d.rd, rs | d.immI); break; // ORI
+          case 7: this.wr(d.rd, rs & d.immI); break; // ANDI
+        }
+        break;
+      }
+      case 0x17:
+        this.wr(d.rd, this.pc + d.immU); break;
+      case 0x23: { // Stores
+        const addr = (this.rd(d.rs1) + d.immS) >>> 0;
+        switch (d.f3) {
+          case 0: this.mem.w8(addr,  this.rd(d.rs2)); break; // SB
+          case 1: this.mem.w16(addr, this.rd(d.rs2)); break; // SH
+          case 2: this.mem.w32(addr, this.rd(d.rs2)); break; // SW
+          default: return this._unknown(d);
+        }
+        break;
+      }
+      case 0x33: { // R-type
+        const a = this.rd(d.rs1), b = this.rd(d.rs2);
+        switch (d.f3) {
+          case 0: this.wr(d.rd, d.f7 === 0x20 ? a - b : a + b); break; // ADD/SUB
+          case 1: this.wr(d.rd, a << (b & 0x1F)); break; // SLL
+          case 2: this.wr(d.rd, a < b ? 1 : 0); break; // SLT
+          case 3: this.wr(d.rd, (a >>> 0) < (b >>> 0) ? 1 : 0); break; // SLTU
+          case 4: this.wr(d.rd, a ^ b); break; // XOR
+          case 5: this.wr(d.rd, d.f7 === 0x20 ? a >> (b & 0x1F) : a >>> (b & 0x1F)); break; // SRA/SRL
+          case 6: this.wr(d.rd, a | b); break; // OR
+          case 7: this.wr(d.rd, a & b); break; // AND
+        }
+        break;
+      }
+      case 0x37: // LUI
+        this.wr(d.rd, d.immU); break;
+      case 0x63: { // Branches
+        const a = this.rd(d.rs1), b = this.rd(d.rs2);
+        let taken = false;
+        switch (d.f3) {
+          case 0: taken = a === b; break; // BEQ
+          case 1: taken = a !== b; break; // BNE
+          case 4: taken = a < b;   break; // BLT
+          case 5: taken = a >= b;  break; // BGE
+          case 6: taken = (a >>> 0) < (b >>> 0); break; // BLTU
+          case 7: taken = (a >>> 0) >= (b >>> 0); break; // BGEU
+          default: return this._unknown(d);
+        }
+        if (taken) { this.pc = (this.pc + d.immB) >>> 0; jumped = true; }
+        break;
+      }
+      case 0x67: // JALR
+        { const t = (this.rd(d.rs1) + d.immI) & ~1;
+          this.wr(d.rd, this.pc + 4);
+          this.pc = t >>> 0; jumped = true; break; }
+      case 0x6F: // JAL
+        this.wr(d.rd, this.pc + 4);
+        this.pc = (this.pc + d.immJ) >>> 0; jumped = true; break;
+      default:
+        return this._unknown(d);
+    }
+
+    if (!jumped) this.pc = (this.pc + 4) >>> 0;
+    this.steps++;
+    return 'ok';
+  }
+
+  _unknown(d) {
+    this.halted = true;
+    return `unknown opcode 0x${d.opcode.toString(16)} at PC=0x${this.pc.toString(16).padStart(8,'0')}`;
+  }
+}
+
+
+const mem = new Memory();
+let cpu = new CPU(mem);
+let programBytes = null;
+let prevRegs = new Int32Array(32);
+
+const statusChip  = document.getElementById('status-chip');
+const pcVal       = document.getElementById('pc-val');
+const stepCount   = document.getElementById('step-count');
+const btnStep     = document.getElementById('btn-step');
+const btnRun      = document.getElementById('btn-run');
+const btnReset    = document.getElementById('btn-reset');
+const regGrid     = document.getElementById('reg-grid');
+const consoleOut  = document.getElementById('console-out');
+const consoleInput= document.getElementById('console-input');
+const memBody     = document.getElementById('mem-body');
+const memAddr     = document.getElementById('mem-addr');
+const memLen      = document.getElementById('mem-len');
+
+const REG_NAMES = [
+  'x0/zero','x1/ra','x2/sp','x3/gp','x4/tp',
+  'x5/t0','x6/t1','x7/t2','x8/s0','x9/s1',
+  'x10/a0','x11/a1','x12/a2','x13/a3','x14/a4','x15/a5',
+  'x16/a6','x17/a7','x18/s2','x19/s3','x20/s4','x21/s5',
+  'x22/s6','x23/s7','x24/s8','x25/s9','x26/s10','x27/s11',
+  'x28/t3','x29/t4','x30/t5','x31/t6'
+];
+
+for (let i = 0; i < 32; i++) {
+  const row = document.createElement('div');
+  row.className = 'reg-row';
+  row.id = `reg-${i}`;
+  row.innerHTML = `<span class="reg-name">${REG_NAMES[i]}</span><span class="reg-val" id="rv-${i}">0x00000000</span>`;
+  regGrid.appendChild(row);
+}
+
+function log(msg, cls = 'log-info') {
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = msg + '\n';
+  consoleOut.appendChild(span);
+  consoleOut.scrollTop = consoleOut.scrollHeight;
+}
+
+function clearConsole() { consoleOut.innerHTML = ''; }
+
+function updateUI() {
+  pcVal.textContent = '0x' + cpu.pc.toString(16).padStart(8, '0').toUpperCase();
+  stepCount.textContent = `${cpu.steps} instruction${cpu.steps !== 1 ? 's' : ''} executed`;
+
+  for (let i = 0; i < 32; i++) {
+    const v = cpu.regs[i];
+    const changed = v !== prevRegs[i];
+    document.getElementById(`rv-${i}`).textContent =
+      '0x' + (v >>> 0).toString(16).padStart(8, '0').toUpperCase();
+    const row = document.getElementById(`reg-${i}`);
+    if (changed) { row.classList.add('changed'); setTimeout(() => row.classList.remove('changed'), 600); }
+  }
+  prevRegs = new Int32Array(cpu.regs);
+
+  if (cpu.halted) {
+    statusChip.textContent = 'Halted';
+    statusChip.className = 'halted';
+    btnStep.disabled = true;
+    btnRun.disabled  = true;
+  }
+
+  refreshMem();
+}
+
+function refreshMem() {
+  const start = parseInt(memAddr.value, 16) || 0;
+  const bytes = parseInt(memLen.value) || 64;
+  const rows = Math.ceil(bytes / 16);
+  let html = '';
+  for (let r = 0; r < rows; r++) {
+    const base = start + r * 16;
+    let hexCells = '', ascii = '';
+    for (let b = 0; b < 16; b++) {
+      const addr = base + b;
+      const val = mem.r8(addr);
+      hexCells += `<td class="byte${val ? ' nz':''}">${val.toString(16).padStart(2,'0').toUpperCase()}</td>`;
+      ascii += (val >= 32 && val < 127) ? String.fromCharCode(val) : '.';
+    }
+    html += `<tr><td class="addr">0x${base.toString(16).padStart(8,'0').toUpperCase()}</td>${hexCells}<td class="ascii">${ascii}</td></tr>`;
+  }
+  memBody.innerHTML = html;
+}
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    programBytes = new Uint8Array(ev.target.result);
+    mem.reset();
+    mem.load(programBytes);
+    cpu = new CPU(mem);
+    prevRegs = new Int32Array(32);
+    btnStep.disabled = false;
+    btnRun.disabled  = false;
+    btnReset.disabled = false;
+    statusChip.textContent = 'Loaded';
+    statusChip.className = 'loaded';
+    log(`"${file.name}" loaded (${programBytes.length} bytes).`, 'log-info');
+    updateUI();
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+btnStep.addEventListener('click', () => doStep());
+
+function doStep() {
+  const result = cpu.step();
+  if (result === 'ok') {
+    log(`step → PC = 0x${cpu.pc.toString(16).padStart(8,'0').toUpperCase()}`, 'log-step');
+  } else if (result === 'halted') {
+    log('CPU is halted.', 'log-warn');
+  } else {
+    log(`Error: ${result}`, 'log-error');
+  }
+  updateUI();
+}
+
+btnRun.addEventListener('click', () => {
+  if (cpu.halted) { log('CPU is halted. Reset first.', 'log-warn'); return; }
+  statusChip.textContent = 'Running';
+  statusChip.className = 'running';
+  btnStep.disabled = true;
+  btnRun.disabled  = true;
+  log('Running...', 'log-warn');
+
+  function runChunk() {
+    let i = 0;
+    while (i++ < 50000 && !cpu.halted) cpu.step();
+    if (!cpu.halted) {
+      requestAnimationFrame(runChunk);
+    } else {
+      log(`Stopped after ${cpu.steps} instructions.`, 'log-step');
+      updateUI();
+    }
+  }
+  requestAnimationFrame(runChunk);
+});
+
+btnReset.addEventListener('click', () => {
+  if (!programBytes) return;
+  mem.reset();
+  mem.load(programBytes);
+  cpu = new CPU(mem);
+  prevRegs = new Int32Array(32);
+  btnStep.disabled = false;
+  btnRun.disabled  = false;
+  statusChip.textContent = 'Loaded';
+  statusChip.className = 'loaded';
+  log('Reset.', 'log-info');
+  updateUI();
+});
+
+consoleInput.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const line = consoleInput.value.trim();
+  consoleInput.value = '';
+  if (!line) return;
+  log('› ' + line, 'log-cmd');
+  handleCommand(line);
+});
+
+function hex8(n) { return '0x' + (n >>> 0).toString(16).padStart(8,'0').toUpperCase(); }
+
+function handleCommand(line) {
+  const parts = line.trim().split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+
+  switch (cmd) {
+    case 'step':
+      doStep(); break;
+
+    case 'run':
+      btnRun.click(); break;
+
+    case 'reset':
+      btnReset.click(); break;
+
+    case 'pc':
+      log(`pc = ${hex8(cpu.pc)}`); break;
+
+    case 'regs': {
+      const targets = parts.slice(1).filter(p => /^x\d+$/i.test(p))
+                          .map(p => parseInt(p.slice(1)));
+      const list = targets.length ? targets : [...Array(32).keys()];
+      list.forEach(i => {
+        if (i >= 0 && i < 32)
+          log(`x${i.toString().padStart(2,' ')} (${REG_NAMES[i].split('/')[1] ?? ''}) = ${hex8(cpu.regs[i])}`);
+        else log(`Unknown register x${i}`, 'log-error');
+      });
+      break;
+    }
+
+    case 'mem': {
+      if (parts.length < 3) { log('Usage: mem <start_hex> <end_hex>', 'log-warn'); break; }
+      const start = parseInt(parts[1], 16);
+      const end   = parseInt(parts[2], 16);
+      let out = `Memory (${hex8(start)}–${hex8(end)}): `;
+      for (let a = start; a <= end; a++)
+        out += mem.r8(a).toString(16).padStart(2,'0').toUpperCase() + ' ';
+      log(out.trim());
+      memAddr.value = '0x' + start.toString(16).padStart(8,'0').toUpperCase();
+      memLen.value  = end - start + 1;
+      refreshMem();
+      break;
+    }
+
+    case 'help':
+      log([
+        'Commands:',
+        '  step                  — execute one instruction',
+        '  run                   — run until halt',
+        '  reset                 — reload program',
+        '  pc                    — print program counter',
+        '  regs [x0 x1 ...]      — print registers (all if none specified)',
+        '  mem <start> <end>     — dump memory range (hex addresses)',
+        '  help                  — show this message',
+      ].join('\n'));
+      break;
+
+    default:
+      log(`Unknown command "${cmd}". Type help.`, 'log-error');
+  }
+}
+
+refreshMem();
+log('RISC-V RV32I Simulator ready. Load a .bin file to begin.', 'log-info');
+log('Type "help" for available commands.', 'log-info');
+</script>
+</body>
+</html>
